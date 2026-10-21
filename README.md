@@ -1,0 +1,1 @@
+# Dinov2_vs_cnn_eurosat
