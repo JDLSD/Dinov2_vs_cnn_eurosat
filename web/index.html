@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Satélites sin píxeles inventados · demo</title>
+<meta name="description" content="Clasifica una imagen satelital con tres modelos entrenados en EuroSAT: stem nativo sobre DINOv2, DINOv2 original y ResNet-18. Todo corre en tu navegador.">
+<script>try{const t=localStorage.getItem("tema");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+<style>
+:root{
+  --bg:#f6f4fa; --surface:#ffffff; --surface-2:#f3effa; --ink:#28282d; --muted:#6b6b75; --line:#e6e1f0;
+  --pur:#4b2a82; --pur-2:#7a5bb5; --or:#e8730c; --or-soft:#fdebdc; --ok:#2e7d32; --warn:#b45309; --warn-soft:#fff4e0;
+  --bar:#cfc5e6; --shadow:0 1px 2px rgba(40,30,70,.06),0 4px 16px rgba(40,30,70,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16141c; --surface:#1f1c27; --surface-2:#2a2536; --ink:#ece9f3; --muted:#a8a3b5; --line:#3a3449;
+    --pur:#b9a3ec; --pur-2:#9a83d6; --or:#ff9a3d; --or-soft:#3b2716; --ok:#6fcf74; --warn:#f0b35a; --warn-soft:#3a2c14;
+    --bar:#4a4060; --shadow:none;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16141c; --surface:#1f1c27; --surface-2:#2a2536; --ink:#ece9f3; --muted:#a8a3b5; --line:#3a3449;
+  --pur:#b9a3ec; --pur-2:#9a83d6; --or:#ff9a3d; --or-soft:#3b2716; --ok:#6fcf74; --warn:#f0b35a; --warn-soft:#3a2c14;
+  --bar:#4a4060; --shadow:none;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+a{color:var(--pur)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+header{background:#4b2a82;color:#fff;padding:28px 0 22px}
+header h1{margin:0;font-size:clamp(22px,4vw,32px);line-height:1.15;letter-spacing:-.01em}
+header p{margin:8px 0 0;max-width:760px;color:#e6ddf5}
+header .tag{display:inline-block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#ffd2ad;margin-bottom:8px}
+main{padding:22px 0 40px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
+h2{font-size:17px;margin:0 0 12px;color:var(--pur)}
+h3{font-size:15px;margin:0 0 6px}
+.muted{color:var(--muted)} .small{font-size:13px}
+.grid-in{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px}
+@media (max-width:820px){.grid-in{grid-template-columns:1fr}}
+.drop{display:block;border:2px dashed var(--pur-2);border-radius:12px;padding:18px;text-align:center;background:var(--surface-2);cursor:pointer}
+.drop.over{border-color:var(--or);background:var(--or-soft)}
+.drop input{display:none}
+.btn{appearance:none;border:1px solid var(--pur);background:var(--pur);color:#fff;border-radius:8px;padding:7px 12px;font:inherit;font-size:14px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--pur)}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+label.inline{display:flex;gap:6px;align-items:center;font-size:14px}
+input[type=number]{width:90px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;margin-top:8px}
+.gallery button{padding:0;border:2px solid transparent;border-radius:6px;background:none;cursor:pointer;line-height:0}
+.gallery button:hover,.gallery button:focus-visible{border-color:var(--or)}
+.gallery img{width:100%;aspect-ratio:1;image-rendering:pixelated;border-radius:4px}
+.views{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.views figure{margin:0}
+.views figcaption{font-size:12px;color:var(--muted);margin-top:4px;max-width:200px}
+canvas.px{image-rendering:pixelated;border-radius:6px;border:1px solid var(--line);display:block}
+#prev{max-width:100%;cursor:crosshair;border-radius:8px;border:1px solid var(--line);display:block}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.cards{grid-template-columns:1fr}}
+.card{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--surface)}
+.card.ours{border:2px solid var(--or);background:linear-gradient(var(--or-soft),var(--surface) 40%)}
+.card .who{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.card.ours .who{color:var(--or);font-weight:600}
+.pred{display:flex;gap:12px;align-items:center;margin:8px 0 10px}
+.pred img{width:64px;height:64px;image-rendering:pixelated;border-radius:6px;border:1px solid var(--line)}
+.pred .cls{font-size:19px;font-weight:700;line-height:1.2}
+.pred .en{font-size:12px;color:var(--muted)}
+.conf{font-variant-numeric:tabular-nums;font-weight:700;font-size:22px}
+.bars{display:grid;gap:5px}
+.bar{display:grid;grid-template-columns:minmax(0,1fr) 58px;gap:6px;align-items:center;font-size:13px}
+.bar .track{position:relative;height:20px;background:var(--surface-2);border-radius:4px;overflow:hidden}
+.bar .fill{position:absolute;inset:0 auto 0 0;background:var(--bar)}
+.bar.top .fill{background:var(--pur-2)} .card.ours .bar.top .fill{background:var(--or)}
+.bar .lab{position:absolute;left:6px;top:0;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;right:4px}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+@media (max-width:600px){#models th:nth-child(2),#models td:nth-child(2){display:none}}
+.meta{margin-top:10px;font-size:13px;color:var(--muted)}
+.flag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--warn-soft);color:var(--warn);margin-top:8px}
+.banner{border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.banner.agree{background:var(--surface-2)} .banner.disagree{background:var(--warn-soft);color:var(--ink)}
+.status{font-size:14px} .progress{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin-top:6px}
+.progress div{height:100%;width:0;background:var(--or);transition:width .2s}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tablewrap{overflow-x:auto}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px} @media (max-width:820px){.cols2{grid-template-columns:1fr}}
+ol,ul{padding-left:20px;margin:6px 0} li{margin:3px 0}
+details summary{cursor:pointer;color:var(--pur);font-weight:600}
+code{background:var(--surface-2);padding:1px 5px;border-radius:4px;font-size:13px}
+.empty{color:var(--muted);text-align:center;padding:30px 10px}
+footer{color:var(--muted);font-size:13px;padding:0 0 30px}
+body.pending .needs-models{display:none}
+
+header .bar-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+header .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.hbtn{appearance:none;border:1px solid rgba(255,255,255,.45);background:rgba(255,255,255,.1);color:#fff;border-radius:999px;padding:7px 14px;font:inherit;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.hbtn:hover,.hbtn:focus-visible{background:rgba(255,255,255,.22)}
+.hbtn.icon{width:38px;height:38px;padding:0;justify-content:center;font-size:17px}
+.classes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+@media (max-width:520px){.classes{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.classes figure{margin:0}
+.classes img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.classes figcaption{font-size:12.5px;font-weight:600;margin-top:4px;line-height:1.25}
+.classes figcaption span{display:block;font-weight:400;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.cards .empty{grid-column:1/-1}
+.err{color:var(--warn);font-size:13px;margin-top:8px;min-height:1em}
+.info{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border-left:3px solid var(--pur-2);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:12px}
+.info .i{flex:none;width:20px;height:20px;border-radius:50%;background:var(--pur-2);color:var(--surface);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-style:italic}
+#preview[hidden],#examples[hidden]{display:none}
+dialog{border:none;border-radius:14px;padding:0;max-width:640px;width:calc(100% - 32px);background:var(--surface);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(20,15,35,.55)}
+dialog .dhead{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}
+dialog .dhead h2{margin:0}
+dialog .dbody{padding:14px 18px 18px}
+dialog .close{appearance:none;border:none;background:var(--surface-2);color:var(--ink);border-radius:999px;width:34px;height:34px;font-size:18px;cursor:pointer}
+.steps{counter-reset:st;list-style:none;padding:0;margin:0}
+.steps li{counter-increment:st;position:relative;padding:0 0 12px 40px;margin:0}
+.steps li::before{content:counter(st);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:var(--pur);color:var(--surface);font-weight:700;display:flex;align-items:center;justify-content:center;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap bar-top">
+    <div>
+      <div class="tag">WAIMLAp 2026 · PUCP · demo</div>
+      <h1>Seeing Satellites Without Invented Pixels</h1>
+      <p>Sube un recorte satelital y compara tres modelos entrenados con EuroSAT (Sentinel-2, 10 m/píxel, Europa).</p>
+    </div>
+    <div class="actions">
+      <button class="hbtn" id="howbtn" type="button">🛰️ ¿Cómo conseguir una imagen?</button>
+      <button class="hbtn icon" id="themebtn" type="button" aria-label="Cambiar tema claro u oscuro" title="Tema claro / oscuro">🌙</button>
+    </div>
+  </div>
+</header>
+
+<dialog id="howto" aria-labelledby="howto-title">
+  <div class="dhead"><h2 id="howto-title">Cómo conseguir una imagen comparable</h2><button class="close" id="howclose" type="button" aria-label="Cerrar">✕</button></div>
+  <div class="dbody">
+    <p class="small muted" style="margin-top:0">Los modelos aprendieron con recortes de 64×64 píxeles a 10 m/píxel (640 × 640 m). Una imagen a esa escala es lo más parecido a lo que vieron.</p>
+    <ol class="steps">
+      <li>Abre el <a href="https://browser.dataspace.copernicus.eu/" target="_blank" rel="noopener">Copernicus Browser</a>. Es gratuito; para descargar hay que crear una cuenta.</li>
+      <li>Busca el lugar y elige la capa <b>Sentinel-2 L2A · True color</b>. Filtra por fechas con <b>poca nubosidad</b>.</li>
+      <li>Descarga la vista (<i>Download image</i>) en <b>PNG o JPG</b> a <b>10 m/píxel</b>, la resolución nativa de las bandas RGB.</li>
+      <li>Súbela aquí, pulsa <b>Sentinel-2 (10 m)</b> y haz clic sobre la zona que quieres clasificar: la página toma una ventana de 640 m.</li>
+    </ol>
+    <details><summary>Lugares sugeridos en el Perú</summary>
+      <ul class="small">
+        <li><b>Bosque:</b> Reserva Nacional Tambopata (Madre de Dios)</li>
+        <li><b>Río:</b> meandros del Ucayali cerca de Pucallpa</li>
+        <li><b>Mar / lago:</b> Lago Titicaca (Puno)</li>
+        <li><b>Residencial:</b> Villa El Salvador o San Juan de Lurigancho (Lima)</li>
+        <li><b>Industrial:</b> zona portuaria del Callao</li>
+        <li><b>Carretera:</b> Panamericana Sur en el desierto de Ica</li>
+        <li><b>Cultivo permanente:</b> viñedos del valle de Ica</li>
+        <li><b>Cultivo anual:</b> arrozales de Lambayeque</li>
+        <li><b>Pastizal / vegetación herbácea:</b> campiña de Cajamarca, puna de Junín</li>
+      </ul>
+      <p class="small muted">Son sugerencias: verifica en la imagen que la escena corresponda de verdad a la clase.</p>
+    </details>
+  </div>
+</dialog>
+
+<main class="wrap">
+  <section id="loadbox" hidden>
+    <div class="status" id="status">Cargando modelos…</div>
+    <div class="progress"><div id="bar"></div></div>
+  </section>
+
+  <section>
+    <div class="grid-in">
+      <div>
+        <h2>1 · Sube tu imagen</h2>
+        <label class="drop" id="drop" tabindex="0">
+          <input type="file" id="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+          <strong>Arrastra una imagen aquí</strong> o haz clic para elegirla<br>
+          <span class="small muted">Solo PNG o JPG. También puedes pegarla (Ctrl+V). Si no es cuadrada, se usa un recorte cuadrado.</span>
+        </label>
+        <div class="err" id="err" role="alert"></div>
+        <div class="row">
+          <label class="inline">Resolución de tu imagen
+            <input type="number" id="mpp" min="0.1" max="1000" step="0.1" placeholder="m/px"> m/píxel</label>
+          <button class="btn ghost" id="s2" type="button">Sentinel-2 (10 m)</button>
+        </div>
+        <div class="info"><span class="i">i</span><span>Los modelos se ejecutan en tu navegador: la imagen no sale de tu equipo.</span></div>
+        <p class="small muted" id="winnote">Sin resolución indicada se usa el cuadrado central completo. Con resolución, se toma una ventana de 640 m (lo que cubre un recorte de EuroSAT); haz clic en la vista previa para moverla.</p>
+        <div id="preview" hidden>
+          <canvas id="prev" width="10" height="10" aria-label="Vista previa con la ventana elegida"></canvas>
+          <div class="views" style="margin-top:12px">
+            <figure><canvas class="px" id="v64" width="64" height="64" style="width:128px;height:128px"></canvas>
+              <figcaption><b>64×64</b>: entrada del <i>stem</i> y de la ResNet</figcaption></figure>
+            <figure><canvas class="px" id="v224" width="224" height="224" style="width:128px;height:128px"></canvas>
+              <figcaption><b>224×224</b>: la misma imagen ampliada para DINOv2 original</figcaption></figure>
+          </div>
+          <p class="small muted" id="imginfo"></p>
+        </div>
+        <div id="examples" hidden>
+          <h3 style="margin-top:14px">O prueba con imágenes de EuroSAT (test)</h3>
+          <div class="gallery" id="gallery"></div>
+        </div>
+      </div>
+      <div>
+        <h2>Clases que puede predecir</h2>
+        <div class="classes" id="classes"></div>
+        <p class="small muted" style="margin-top:10px">Un ejemplo por clase de <b>EuroSAT</b>: Sentinel-2, Europa, 64×64 px = 640 × 640 m.</p>
+        <div class="info"><span class="i">i</span><span>Cualquier imagen se asigna a una de estas 10 clases, aunque la escena no se parezca a ninguna.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2 · Predicciones</h2>
+    <div id="agree"></div>
+    <div class="cards" id="cards"><div class="empty">Elige una imagen para ver las predicciones.</div></div>
+    <p class="small muted" style="margin-top:12px"><b>Confianza ≠ precisión.</b> El porcentaje es la probabilidad <i>softmax</i> que el modelo asigna a la clase: un modelo puede equivocarse con 99 % de confianza, sobre todo fuera de Europa. La precisión real del modelo para esa clase la da el <b>F1 en EuroSAT-test</b> que aparece debajo de cada predicción.</p>
+  </section>
+
+  <section>
+    <h2>Cómo interpretar un resultado en el Perú</h2>
+    <ul>
+      <li>Los modelos solo conocen <b>10 clases</b> europeas. Una mina, un desierto o un nevado no tienen clase: el modelo elegirá la más parecida.</li>
+      <li>En un dominio nuevo (NWPU-RESISC45, imágenes de 100+ países) el F1 cayó de ~0.98 a <span id="resisc-txt">0.24–0.45</span>. El <i>stem</i> fue el más robusto, pero ninguno es fiable sin datos locales.</li>
+      <li>El color también cambia: EuroSAT se armó con su propio realce de brillo, distinto del <i>True color</i> de los visores. Es parte del cambio de dominio.</li>
+      <li>Si los tres modelos coinciden con alta confianza, es una señal (no una prueba) de que la escena se parece a EuroSAT.</li>
+    </ul>
+  </section>
+
+  <section class="needs-models">
+    <h2>Los modelos</h2>
+    <div class="tablewrap"><table id="models"><thead><tr>
+      <th>Modelo</th><th>Qué hace</th><th class="n">Parámetros entrenados</th><th class="n">F1 EuroSAT 10 %</th><th class="n">F1 EuroSAT 100 %</th><th class="n">F1 RESISC45</th>
+    </tr></thead><tbody></tbody></table></div>
+    <p class="small muted">Macro-F1 en EuroSAT-test, media de 3 semillas; RESISC45: 8 clases comunes, sin reentrenar. La demo usa los modelos entrenados con 100 % de etiquetas (semilla 0).</p>
+    <details><summary>Detalles técnicos y autoprueba</summary>
+      <div class="small" id="diag" style="margin-top:8px"></div>
+    </details>
+  </section>
+</main>
+<footer class="wrap">
+  De los Santos Diaz, J. J. · Taquiri Diaz, L. · Camarena, L. — Pontificia Universidad Católica del Perú. Deep Learning 1INF52, 2026-2.<br>
+  <a id="repofoot" href="#">Repositorio del proyecto</a> · DINOv2 (Meta, Apache 2.0) · EuroSAT (Helber et al., 2019) · NWPU-RESISC45 (Cheng et al., 2017) · ONNX Runtime Web (MIT).
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script src="preprocess.js"></script>
+<script>
+"use strict";
+const ORT_DIST = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/";
+const $ = (id) => document.getElementById(id);
+const S = { cfg: null, sess: {}, img: null, win: null, mpp: null, busy: false, pending: false };
+const CLASSES = ["AnnualCrop", "Forest", "HerbaceousVegetation", "Highway", "Industrial", "Pasture", "PermanentCrop", "Residential", "River", "SeaLake"];
+const CLASSES_ES = ["Cultivo anual", "Bosque", "Vegetación herbácea", "Carretera", "Industrial", "Pastizal", "Cultivo permanente", "Residencial", "Río", "Mar / lago"];
+const PRE_DEFAULT = { native: 64, dino: 224, tile_meters: 640 };   // se usa mientras no haya config.json
+const pre = () => (S.cfg ? S.cfg.preprocess : PRE_DEFAULT);
+const pct = (p) => (p * 100).toFixed(p >= 0.995 || p < 0.001 ? 0 : 1) + " %";
+const f3 = (x) => (x == null ? "—" : x.toFixed(3));
+
+function status(msg, frac) { $("status").innerHTML = msg; if (frac != null) $("bar").style.width = Math.round(frac * 100) + "%"; }
+
+// Descarga con progreso. No usa content-length para reservar memoria: si el servidor comprime, ese valor no es el tamaño real.
+async function fetchWithProgress(url, expected, onp) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(r.status === 404 ? `no se encontró <code>${url}</code> en el servidor. ¿Se subió al repositorio? (revisa el .gitignore)` : `${url}: HTTP ${r.status}`);
+  let buf;
+  if (!r.body) buf = new Uint8Array(await r.arrayBuffer());
+  else {
+    const reader = r.body.getReader(), chunks = []; let got = 0;
+    for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); got += value.length; onp(Math.min(1, got / expected)); }
+    buf = new Uint8Array(got); let o = 0; for (const c of chunks) { buf.set(c, o); o += c.length; }
+  }
+  if (buf.length < 100000) throw new Error(`<code>${url}</code> pesa solo ${buf.length} bytes: no es el modelo (¿puntero de Git LFS o archivo incompleto?)`);
+  return buf;
+}
+
+// Enlace al repositorio deducido de la URL de GitHub Pages: https://usuario.github.io/repo/ → https://github.com/usuario/repo
+function repoURL() {
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/), repo = location.pathname.split("/").filter(Boolean)[0];
+  return m ? `https://github.com/${m[1]}/${repo || m[1] + ".github.io"}` : "#";
+}
+function showPending() {   // sin modelos publicados: la página funciona igual, salvo las predicciones
+  document.body.classList.add("pending");
+  $("cards").innerHTML = `<div class="empty">Las predicciones aparecerán aquí cuando se publiquen los modelos.<br>Mientras tanto, puedes subir tu imagen y ver cómo la recibirá el modelo (64×64 y 224×224).</div>`;
+}
+
+// Tema claro / oscuro: respeta el del sistema hasta que el usuario elija
+function effectiveTheme() { return document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); }
+function syncThemeIcon() { const d = effectiveTheme() === "dark"; $("themebtn").textContent = d ? "☀️" : "🌙"; $("themebtn").setAttribute("aria-label", d ? "Cambiar a tema claro" : "Cambiar a tema oscuro"); }
+$("themebtn").onclick = () => { const t = effectiveTheme() === "dark" ? "light" : "dark"; document.documentElement.dataset.theme = t;
+  try { localStorage.setItem("tema", t); } catch (e) {} syncThemeIcon(); };
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncThemeIcon); syncThemeIcon();
+
+// Ventana emergente con los pasos
+$("howbtn").onclick = () => $("howto").showModal();
+$("howclose").onclick = () => $("howto").close();
+$("howto").addEventListener("click", (e) => { if (e.target === $("howto")) $("howto").close(); });
+
+// Clases de referencia (archivos fijos, no dependen de los modelos)
+$("classes").innerHTML = CLASSES.map((c, i) => `<figure><img src="assets/clases/${c}.png" alt="${CLASSES_ES[i]}" loading="lazy"><figcaption>${CLASSES_ES[i]}<span>${c}</span></figcaption></figure>`).join("");
+
+// Solo PNG o JPG
+function okType(f) { return f && (/^image\/(png|jpeg)$/.test(f.type) || /\.(png|jpe?g)$/i.test(f.name || "")); }
+function takeFile(f) {
+  if (!okType(f)) { $("err").textContent = "Formato no admitido: sube una imagen PNG o JPG."; return; }
+  $("err").textContent = ""; loadBlob(f, null);
+}
+
+function fail(msg) { $("loadbox").hidden = false; status(`<b>No se pudieron cargar los modelos.</b> ${msg}`); }
+
+async function init() {
+  if (location.protocol === "file:") {   // abierto con doble clic: el navegador bloquea fetch() de archivos locales
+    showPending();
+    fail(`Abriste el archivo directamente (<code>file://</code>) y el navegador bloquea la lectura de <code>config.json</code> y de los modelos.
+      Ábrela desde GitHub Pages o con un servidor local: en la carpeta <code>web</code>, <code>python -m http.server 8000</code> y entra a <code>http://localhost:8000</code>.`);
+    return;
+  }
+  let r;
+  try { r = await fetch("config.json", { cache: "no-cache" }); }
+  catch (e) { showPending(); fail(`No se pudo pedir <code>config.json</code> (${e.message}).`); return; }
+  if (r.status === 404) { showPending(); return; }   // aún no se publicaron los modelos
+  if (!r.ok) { showPending(); fail(`<code>config.json</code> respondió HTTP ${r.status}.`); return; }
+  try { S.cfg = await r.json(); }
+  catch (e) { showPending(); fail("<code>config.json</code> no es un JSON válido."); return; }
+  $("loadbox").hidden = false; renderStatic();
+  if (typeof ort === "undefined") { fail("No se pudo descargar ONNX Runtime Web desde el CDN (cdn.jsdelivr.net). Revisa tu conexión o un bloqueador."); return; }
+  ort.env.wasm.wasmPaths = ORT_DIST;
+  ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+  const m = S.cfg.models, total = m.dino.bytes + m.resnet.bytes; let done = 0;
+  try {
+    for (const key of ["dino", "resnet"]) {
+      const mb = (m[key].bytes / 2 ** 20).toFixed(0);
+      const t0 = performance.now();
+      const buf = await fetchWithProgress(m[key].file, m[key].bytes, (f) => status(`Descargando modelos (${((done + f * m[key].bytes) / 2 ** 20).toFixed(0)} de ${(total / 2 ** 20).toFixed(0)} MB)…`, (done + f * m[key].bytes) / total));
+      done += m[key].bytes;
+      status(`Preparando ${key === "dino" ? "DINOv2" : "ResNet-18"} (${mb} MB)…`, done / total);
+      S.sess[key] = await ort.InferenceSession.create(buf, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+      S.sess[key]._ms = performance.now() - t0;
+    }
+  } catch (e) { console.error(e); fail(e.message || String(e)); return; }
+  status("Modelos listos. Ejecutando autoprueba…", 1);
+  await selftest();
+  $("loadbox").hidden = true;
+  if (!S.img) await loadURL(S.cfg.examples[S.cfg.classes[7]][0], true);
+}
+
+function renderStatic() {
+  const c = S.cfg, g = $("gallery"); g.innerHTML = ""; $("examples").hidden = false;
+  c.classes.forEach((cl, i) => c.examples[cl].slice(0, 2).forEach((f) => {
+    const b = document.createElement("button"); b.title = `${c.classes_es[i]} (${cl})`;
+    b.innerHTML = `<img src="${f}" alt="${c.classes_es[i]}">`; b.onclick = () => loadURL(f, true); g.appendChild(b);
+  }));
+  const tb = $("models").querySelector("tbody"); tb.innerHTML = "";
+  for (const k of c.cards) {
+    const e = k.f1_eurosat, sd = (o) => (o && o.sd != null ? ` <span class="muted">± ${o.sd.toFixed(3)}</span>` : "");
+    tb.insertAdjacentHTML("beforeend", `<tr><td><b>${k.name}</b></td><td class="small">${k.description}</td>
+      <td class="n">${k.trainable_params.toLocaleString("es-PE")}</td><td class="n">${f3(e["10"] && e["10"].mean)}${sd(e["10"])}</td>
+      <td class="n">${f3(e["100"] && e["100"].mean)}${sd(e["100"])}</td><td class="n">${f3(k.f1_resisc45)}</td></tr>`);
+  }
+  const rs = c.cards.map((k) => k.f1_resisc45).filter((x) => x != null);
+  if (rs.length) $("resisc-txt").textContent = `${Math.min(...rs).toFixed(2)}–${Math.max(...rs).toFixed(2)}`;
+}
+
+async function loadURL(url, isExample) {
+  const blob = await (await fetch(url)).blob(); await loadBlob(blob, isExample ? url.split("/").pop() : null);
+  if (isExample) { $("mpp").value = ""; S.mpp = null; }
+}
+
+async function loadBlob(blob, exampleName) {
+  let bmp;
+  try { bmp = await createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" }); }
+  catch (e) { $("err").textContent = "No se pudo leer la imagen. Usa PNG o JPG."; return; }
+  const MAX = 6000, sc = Math.min(1, MAX / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * sc), h = Math.round(bmp.height * sc);
+  const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const ctx = cv.getContext("2d", { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0, w, h);
+  S.img = { w, h, rgba: ctx.getImageData(0, 0, w, h).data, bmp: cv, name: exampleName, scaled: sc < 1 };
+  $("preview").hidden = false; S.win = null; setWindow(w / 2, h / 2); await classify();
+}
+
+function setWindow(cx, cy) {
+  const { w, h } = S.img; let side = Math.min(w, h), note = "";
+  if (S.mpp) {
+    const want = Math.round(pre().tile_meters / S.mpp);
+    if (want > side) note = `La imagen cubre menos de ${pre().tile_meters} m; se usa el cuadrado completo (${(side * S.mpp).toFixed(0)} m).`;
+    side = Math.max(1, Math.min(side, want));
+  }
+  const x0 = Math.round(Math.min(Math.max(cx - side / 2, 0), w - side)), y0 = Math.round(Math.min(Math.max(cy - side / 2, 0), h - side));
+  S.win = { x0, y0, side, note }; drawPreview();
+}
+
+function drawPreview() {
+  const { w, h, bmp } = S.img, { x0, y0, side } = S.win, cv = $("prev");
+  const maxW = Math.min(cv.parentElement.clientWidth || 400, 480), sc = Math.min(maxW / w, 360 / h) || 1;
+  cv.width = Math.round(w * sc); cv.height = Math.round(h * sc);
+  const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = sc < 1; ctx.imageSmoothingQuality = "high"; ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+  ctx.lineWidth = 2; ctx.strokeStyle = "#e8730c"; ctx.strokeRect(x0 * sc + 1, y0 * sc + 1, side * sc - 2, side * sc - 2);
+  cv._sc = sc;
+  const meters = S.mpp ? ` · ventana de ${side} px ≈ ${(side * S.mpp).toFixed(0)} m` : ` · ventana de ${side}×${side} px`;
+  $("imginfo").textContent = `${S.img.name ? "Ejemplo de EuroSAT-test: " + S.img.name : "Tu imagen"} · ${w}×${h} px${meters}` +
+    (S.img.scaled ? " · (imagen muy grande, reducida para la vista)" : "") + (S.win.note ? " · " + S.win.note : "");
+}
+
+function softmax(a) { const m = Math.max(...a), e = a.map((v) => Math.exp(v - m)), s = e.reduce((x, y) => x + y, 0); return e.map((v) => v / s); }
+
+async function inferRGB(rgb, side) {
+  const P = S.cfg.preprocess;
+  const r64 = Pre.resize(rgb, side, side, P.native, P.native, "bilinear");
+  const r224 = Pre.resize(r64, P.native, P.native, P.dino, P.dino, "bicubic");
+  const n = P.native, d = P.dino, t0 = performance.now();
+  const od = await S.sess.dino.run({
+    x64: new ort.Tensor("float32", Pre.toTensor(r64, n, P.imnet.mean, P.imnet.std), [1, 3, n, n]),
+    x224: new ort.Tensor("float32", Pre.toTensor(r224, d, P.imnet.mean, P.imnet.std), [1, 3, d, d]) });
+  const t1 = performance.now();
+  const oc = await S.sess.resnet.run({ x: new ort.Tensor("float32", Pre.toTensor(r64, n, P.cnn_norm.mean, P.cnn_norm.std), [1, 3, n, n]) });
+  const t2 = performance.now();
+  return { r64, r224, ms: { dino: t1 - t0, resnet: t2 - t1 },
+           probs: { stem: softmax(Array.from(od.logits_stem.data)), base: softmax(Array.from(od.logits_base.data)), resnet: softmax(Array.from(oc.logits.data)) } };
+}
+
+function paint(id, rgb, s) {
+  const cv = $(id), ctx = cv.getContext("2d"), im = ctx.createImageData(s, s);
+  for (let i = 0; i < s * s; i++) { im.data[i * 4] = rgb[i * 3]; im.data[i * 4 + 1] = rgb[i * 3 + 1]; im.data[i * 4 + 2] = rgb[i * 3 + 2]; im.data[i * 4 + 3] = 255; }
+  ctx.putImageData(im, 0, 0);
+}
+
+async function classify() {
+  if (!S.img) return;
+  if (!S.sess.dino) {   // sin modelos: solo se muestra lo que recibiría cada modelo
+    const P = pre(), { x0, y0, side } = S.win, rgb = Pre.cropRGB(S.img.rgba, S.img.w, x0, y0, side);
+    const r64 = Pre.resize(rgb, side, side, P.native, P.native, "bilinear");
+    paint("v64", r64, P.native); paint("v224", Pre.resize(r64, P.native, P.native, P.dino, P.dino, "bicubic"), P.dino); return;
+  }
+  if (S.busy) { S.pending = true; return; }
+  S.busy = true;
+  try {
+    const { x0, y0, side } = S.win, rgb = Pre.cropRGB(S.img.rgba, S.img.w, x0, y0, side);
+    const out = await inferRGB(rgb, side);
+    paint("v64", out.r64, S.cfg.preprocess.native); paint("v224", out.r224, S.cfg.preprocess.dino);
+    renderCards(out);
+  } finally { S.busy = false; if (S.pending) { S.pending = false; classify(); } }
+}
+
+function renderCards(out) {
+  const c = S.cfg, el = $("cards"); el.innerHTML = "";
+  const truth = S.img.name ? S.img.name.replace(/_\d+\.png$/, "") : null, tops = {};
+  for (const k of c.cards) {
+    const p = out.probs[k.key], order = p.map((v, i) => i).sort((a, b) => p[b] - p[a]), t = order[0]; tops[k.key] = t;
+    const ok = truth ? (c.classes[t] === truth ? `<span style="color:var(--ok)">✓ coincide con la etiqueta</span>` : `<span style="color:var(--warn)">✗ la etiqueta es ${c.classes_es[c.classes.indexOf(truth)]}</span>`) : "";
+    const f1c = k.f1_per_class_test[t], ms = k.key === "resnet" ? out.ms.resnet : out.ms.dino;
+    el.insertAdjacentHTML("beforeend", `<div class="card ${k.key === "stem" ? "ours" : ""}">
+      <div class="who">${k.key === "stem" ? "Nuestro · " : ""}${k.name}</div>
+      <div class="pred"><img src="${c.examples[c.classes[t]][0]}" alt="ejemplo de ${c.classes_es[t]}" title="Ejemplo de EuroSAT para esta clase">
+        <div><div class="cls">${c.classes_es[t]}</div><div class="en">${c.classes[t]} · ejemplo de la clase a la izquierda</div>
+        <div class="conf">${pct(p[t])}</div></div></div>
+      <div class="bars">${order.slice(0, 3).map((i, j) => `<div class="bar ${j ? "" : "top"}"><div class="track"><div class="fill" style="width:${(p[i] * 100).toFixed(1)}%"></div>
+        <div class="lab">${c.classes_es[i]}</div></div><div class="v">${pct(p[i])}</div></div>`).join("")}</div>
+      ${p[t] < 0.5 ? `<div class="flag">Confianza baja: ninguna clase domina</div>` : ""}
+      <div class="meta">F1 de <b>${c.classes_es[t]}</b> en EuroSAT-test: <b>${f1c.toFixed(3)}</b><br>${ok}${ok ? "<br>" : ""}Tiempo: ${ms.toFixed(0)} ms${k.key !== "resnet" ? " (ambas ramas de DINOv2)" : ""}</div>
+    </div>`);
+  }
+  const uniq = new Set(Object.values(tops)).size;
+  $("agree").innerHTML = uniq === 1
+    ? `<div class="banner agree">Los tres modelos coinciden: <b>${c.classes_es[tops.stem]}</b>.</div>`
+    : `<div class="banner disagree">Los modelos no coinciden (${uniq} clases distintas). Tómalo como señal de que la imagen es ambigua o está lejos de EuroSAT.</div>`;
+}
+
+async function selftest() {
+  const c = S.cfg, rows = [];
+  for (const t of c.selftest || []) {
+    const blob = await (await fetch(t.file)).blob(), bmp = await createImageBitmap(blob, { colorSpaceConversion: "none", premultiplyAlpha: "none" });
+    const cv = document.createElement("canvas"); cv.width = bmp.width; cv.height = bmp.height;
+    const ctx = cv.getContext("2d", { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0);
+    const rgb = Pre.cropRGB(ctx.getImageData(0, 0, bmp.width, bmp.height).data, bmp.width, 0, 0, bmp.width);
+    const out = await inferRGB(rgb, bmp.width);
+    const d = {}; for (const k of ["stem", "base", "resnet"]) d[k] = Math.max(...out.probs[k].map((v, i) => Math.abs(v - t.probs[k][i])));
+    rows.push({ label: t.label, ...d });
+  }
+  const worst = rows.length ? Math.max(...rows.flatMap((r) => [r.stem, r.base, r.resnet])) : NaN;
+  const v = c.verification || {};
+  $("diag").innerHTML = `
+    <p>ONNX Runtime Web 1.20.1 · backend WebAssembly · hilos: ${ort.env.wasm.numThreads}${self.crossOriginIsolated ? "" : " (el servidor no habilita multihilo)"}.</p>
+    <p>Archivos: <code>${c.models.dino.file}</code> (${(c.models.dino.bytes / 2 ** 20).toFixed(1)} MB, un solo grafo con el <i>stem</i> y el <code>patch_embed</code> original compartiendo los 12 bloques) y
+      <code>${c.models.resnet.file}</code> (${(c.models.resnet.bytes / 2 ** 20).toFixed(1)} MB). Carga: ${(S.sess.dino._ms / 1000).toFixed(1)} s y ${(S.sess.resnet._ms / 1000).toFixed(1)} s.</p>
+    <p>Preprocesamiento: recorte cuadrado → 64×64 (bilineal de PIL) → normalización de ImageNet (DINOv2) o <code>CNN_NORM</code> (ResNet); para DINOv2 original, 64→224 (bicúbico de PIL).
+      Reimplementado en <code>preprocess.js</code>; coincide píxel a píxel con Pillow.</p>
+    <p><b>Autoprueba</b> (probabilidades del navegador vs ONNX Runtime en Python, ${rows.length} imágenes): Δmax = ${isFinite(worst) ? worst.toExponential(1) : "—"}
+      ${isFinite(worst) ? (worst < 1e-3 ? "✓" : "⚠ revisa el preprocesamiento") : ""}</p>
+    ${v.n_images ? `<p>Verificación en el cuaderno (${v.n_images} imágenes de test): int8 coincide con PyTorch en ${(v.int8_agreement * 100).toFixed(1)} % de las predicciones.</p>` : ""}
+    <p>Modelos entrenados el ${c.created} (presupuesto ${c.demo_budget * 100} %, semilla ${c.demo_seed}).</p>`;
+}
+
+// Eventos
+const drop = $("drop");
+$("file").onchange = (e) => { if (e.target.files[0]) takeFile(e.target.files[0]); e.target.value = ""; };
+["dragenter", "dragover"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) takeFile(f); });
+drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } });
+document.addEventListener("paste", (e) => { const it = [...(e.clipboardData || {}).items || []].find((i) => i.type.startsWith("image/")); if (it) takeFile(it.getAsFile()); });
+$("prev").addEventListener("click", (e) => {
+  if (!S.img) return; const r = e.target.getBoundingClientRect(), sc = e.target._sc * (r.width / e.target.width);
+  setWindow((e.clientX - r.left) / sc, (e.clientY - r.top) / sc); classify();
+});
+$("mpp").addEventListener("change", () => { const v = parseFloat($("mpp").value); S.mpp = v > 0 ? v : null; if (S.img) { setWindow(S.win.x0 + S.win.side / 2, S.win.y0 + S.win.side / 2); classify(); } });
+$("s2").onclick = () => { $("mpp").value = 10; $("mpp").dispatchEvent(new Event("change")); };
+window.addEventListener("resize", () => S.img && drawPreview());
+document.getElementById("repofoot").href = repoURL();
+init();
+</script>
+</body>
+</html>
