@@ -1,0 +1,402 @@
+{
+ "title": "Seeing Satellites Without Invented Pixels · demo",
+ "created": "2026-11-08",
+ "demo_budget": 1.0,
+ "demo_seed": 0,
+ "classes": [
+  "AnnualCrop",
+  "Forest",
+  "HerbaceousVegetation",
+  "Highway",
+  "Industrial",
+  "Pasture",
+  "PermanentCrop",
+  "Residential",
+  "River",
+  "SeaLake"
+ ],
+ "classes_es": [
+  "Cultivo anual",
+  "Bosque",
+  "Vegetación herbácea",
+  "Carretera",
+  "Industrial",
+  "Pastizal",
+  "Cultivo permanente",
+  "Residencial",
+  "Río",
+  "Mar / lago"
+ ],
+ "preprocess": {
+  "native": 64,
+  "dino": 224,
+  "resize_native": "PIL bilinear (antialias)",
+  "resize_dino": "PIL bicubic 64→224",
+  "imnet": {
+   "mean": [
+    0.485,
+    0.456,
+    0.406
+   ],
+   "std": [
+    0.229,
+    0.224,
+    0.225
+   ]
+  },
+  "cnn_norm": {
+   "mean": [
+    0.3492331802845001,
+    0.38288813829421997,
+    0.40924960374832153
+   ],
+   "std": [
+    0.20369455218315125,
+    0.13660244643688202,
+    0.11509405076503754
+   ]
+  },
+  "meters_per_pixel": 10,
+  "tile_meters": 640
+ },
+ "models": {
+  "dino": {
+   "file": "models/dinov2_dual_fp32.onnx",
+   "bytes": 87987059,
+   "inputs": [
+    "x64",
+    "x224"
+   ]
+  },
+  "resnet": {
+   "file": "models/resnet18.onnx",
+   "bytes": 44686156,
+   "inputs": [
+    "x"
+   ]
+  }
+ },
+ "cards": [
+  {
+   "key": "stem",
+   "name": "Stem nativo · A+B",
+   "output": "logits_stem",
+   "description": "Lee los 64 px nativos con un stem convolucional entrenado (A: destilación, B: etiquetas). Bloques congelados.",
+   "trainable_params": 291130,
+   "f1_eurosat": {
+    "10": {
+     "mean": 0.9503570166720473,
+     "sd": 0.0026213070289337866
+    },
+    "100": {
+     "mean": 0.9773846540011041,
+     "sd": 0.0005332208481934589
+    }
+   },
+   "f1_per_class_test": [
+    0.9658,
+    0.99,
+    0.9724,
+    0.9734,
+    0.9866,
+    0.9653,
+    0.9635,
+    0.9901,
+    0.9704,
+    0.9911
+   ],
+   "f1_resisc45": 0.44678171471578043
+  },
+  {
+   "key": "base",
+   "name": "DINOv2-reg (original)",
+   "output": "logits_base",
+   "description": "DINOv2-reg congelado: la imagen se amplía a 224 px y entra por el patch_embed original. Solo la cabeza lineal se entrenó.",
+   "trainable_params": 7690,
+   "f1_eurosat": {
+    "10": {
+     "mean": 0.9375529752937597,
+     "sd": 0.0020926943344765463
+    },
+    "100": {
+     "mean": 0.969115051844328,
+     "sd": 0.0008338687054086722
+    }
+   },
+   "f1_per_class_test": [
+    0.9689,
+    0.9877,
+    0.9579,
+    0.9593,
+    0.984,
+    0.9455,
+    0.9506,
+    0.9857,
+    0.9654,
+    0.9956
+   ],
+   "f1_resisc45": 0.3867579533523376
+  },
+  {
+   "key": "resnet",
+   "name": "ResNet-18 (desde cero)",
+   "output": "logits",
+   "description": "ResNet-18 entrenada desde cero en EuroSAT (11 M de parámetros, sin preentrenamiento).",
+   "trainable_params": 11173962,
+   "f1_eurosat": {
+    "10": {
+     "mean": 0.9405567474422017,
+     "sd": 0.005255706692172922
+    },
+    "100": {
+     "mean": 0.9798261001718517,
+     "sd": 0.001451539742668911
+    }
+   },
+   "f1_per_class_test": [
+    0.9669,
+    0.9945,
+    0.9854,
+    0.9814,
+    0.9894,
+    0.9651,
+    0.964,
+    0.9944,
+    0.9813,
+    0.9922
+   ],
+   "f1_resisc45": 0.23694124563327787
+  }
+ ],
+ "examples": {
+  "AnnualCrop": [
+   "examples/AnnualCrop_0.png",
+   "examples/AnnualCrop_1.png",
+   "examples/AnnualCrop_2.png"
+  ],
+  "Forest": [
+   "examples/Forest_0.png",
+   "examples/Forest_1.png",
+   "examples/Forest_2.png"
+  ],
+  "HerbaceousVegetation": [
+   "examples/HerbaceousVegetation_0.png",
+   "examples/HerbaceousVegetation_1.png",
+   "examples/HerbaceousVegetation_2.png"
+  ],
+  "Highway": [
+   "examples/Highway_0.png",
+   "examples/Highway_1.png",
+   "examples/Highway_2.png"
+  ],
+  "Industrial": [
+   "examples/Industrial_0.png",
+   "examples/Industrial_1.png",
+   "examples/Industrial_2.png"
+  ],
+  "Pasture": [
+   "examples/Pasture_0.png",
+   "examples/Pasture_1.png",
+   "examples/Pasture_2.png"
+  ],
+  "PermanentCrop": [
+   "examples/PermanentCrop_0.png",
+   "examples/PermanentCrop_1.png",
+   "examples/PermanentCrop_2.png"
+  ],
+  "Residential": [
+   "examples/Residential_0.png",
+   "examples/Residential_1.png",
+   "examples/Residential_2.png"
+  ],
+  "River": [
+   "examples/River_0.png",
+   "examples/River_1.png",
+   "examples/River_2.png"
+  ],
+  "SeaLake": [
+   "examples/SeaLake_0.png",
+   "examples/SeaLake_1.png",
+   "examples/SeaLake_2.png"
+  ]
+ },
+ "selftest": [
+  {
+   "file": "examples/Forest_0.png",
+   "label": "Forest",
+   "probs": {
+    "stem": [
+     2.700000004551839e-05,
+     0.9990329742431641,
+     0.0007179999956861138,
+     0.0,
+     0.0,
+     0.00019299999985378236,
+     1.9999999949504854e-06,
+     9.999999974752427e-07,
+     2.2000000171829015e-05,
+     3.999999989900971e-06
+    ],
+    "base": [
+     9.999999974752427e-07,
+     0.9965519905090332,
+     0.000818000000435859,
+     0.0,
+     0.0,
+     0.002615999896079302,
+     0.0,
+     0.0,
+     9.999999747378752e-06,
+     1.9999999949504854e-06
+    ],
+    "resnet": [
+     1.2000000424450263e-05,
+     0.999442994594574,
+     0.00022699999681208283,
+     9.999999974752427e-07,
+     0.0,
+     0.00031400000443682075,
+     0.0,
+     0.0,
+     3.000000106112566e-06,
+     0.0
+    ]
+   }
+  },
+  {
+   "file": "examples/Highway_0.png",
+   "label": "Highway",
+   "probs": {
+    "stem": [
+     1.9999999949504854e-06,
+     0.0,
+     9.999999974752427e-07,
+     0.9737100005149841,
+     0.0,
+     0.0005600000149570405,
+     0.0050200000405311584,
+     9.000000318337698e-06,
+     0.020690999925136566,
+     7.000000096013537e-06
+    ],
+    "base": [
+     9.300000237999484e-05,
+     0.0,
+     1.1000000085914508e-05,
+     0.9513599872589111,
+     7.000000096013537e-06,
+     0.00035600000410340726,
+     0.008634000085294247,
+     9.999999747378752e-06,
+     0.03950800001621246,
+     2.2000000171829015e-05
+    ],
+    "resnet": [
+     0.0,
+     0.0,
+     0.0,
+     0.9995200037956238,
+     5.0999999075429514e-05,
+     1.1000000085914508e-05,
+     5.900000178371556e-05,
+     0.0,
+     0.0003589999978430569,
+     0.0
+    ]
+   }
+  },
+  {
+   "file": "examples/Residential_0.png",
+   "label": "Residential",
+   "probs": {
+    "stem": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     4.999999873689376e-06,
+     0.0,
+     3.000000106112566e-06,
+     0.9999909996986389,
+     0.0,
+     0.0
+    ],
+    "base": [
+     0.0,
+     0.0,
+     0.0,
+     7.000000096013537e-06,
+     8.399999933317304e-05,
+     0.0,
+     9.999999974752427e-07,
+     0.9999079704284668,
+     0.0,
+     0.0
+    ],
+    "resnet": [
+     0.0,
+     0.0,
+     0.0,
+     0.00034500000765547156,
+     0.0009420000133104622,
+     0.0,
+     0.0,
+     0.9987050294876099,
+     7.999999979801942e-06,
+     0.0
+    ]
+   }
+  },
+  {
+   "file": "examples/SeaLake_0.png",
+   "label": "SeaLake",
+   "probs": {
+    "stem": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    "base": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     1.0
+    ],
+    "resnet": [
+     3.999999989900971e-06,
+     3.9999998989515007e-05,
+     3.000000106112566e-06,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.9999529719352722
+    ]
+   }
+  }
+ ],
+ "verification": {
+  "n_images": 400,
+  "int8_agreement": 0.985,
+  "f1_onnx": {
+   "Stem A+B": 0.9600443969619468,
+   "DINOv2 original": 0.96235898152819,
+   "ResNet-18": 0.9749898377648712
+  }
+ }
+}
